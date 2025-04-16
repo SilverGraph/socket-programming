@@ -1,17 +1,44 @@
 import * as stream from 'stream';
-import zlib from 'zlib';
+import * as zlib from 'zlib';
 import { BodyReader, HTTPReq, HTTPRes } from "../../custom_types";
-import { fieldGet } from "../buffer";
+import { fieldGet, fieldGetList } from "../buffer";
+import { pipeline } from "stream/promises"
+
+function body2stream(reader: BodyReader): stream.Readable {
+    let self: null | stream.Readable = null
+    self = new stream.Readable({
+        read: async () => {
+            try {
+                const data: Buffer = await reader.read()
+                self!.push(data.length > 0 ? data : null)
+            } catch (err) {
+                self!.destroy(err instanceof Error ? err : new Error('IO'))
+            }
+        }
+    })
+    return self
+}
 
 function gzipFilter(reader: BodyReader): BodyReader {
     const gz: stream.Duplex = zlib.createGzip()
+    const input: stream.Readable = body2stream(reader);
+    (async () => {
+        try { await pipeline(input, gz) }
+        catch (err) { gz.destroy(err) }
+    })()
+
+    const iter = async function* (stream: stream.Readable): AsyncGenerator<Buffer> {
+        for await (const chunk of stream) {
+            yield chunk as Buffer;
+        }
+    }(gz);
     return {
         length: -1,
         read: async (): Promise<Buffer> => {
-            const data = await reader.read()
-            await write_input(gz, data)
-            return await read_output(gz)
-        }
+            const r: IteratorResult<Buffer> = await iter.next()
+            return r.done ? Buffer.from('') : r.value
+        },
+        close: reader.close
     }
 }
 
@@ -32,3 +59,4 @@ function enableCompression(req: HTTPReq, res: HTTPRes): void {
     res.body = gzipFilter(res.body)
 }
 
+export { enableCompression }

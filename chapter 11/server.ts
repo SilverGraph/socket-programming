@@ -3,6 +3,7 @@ import { TCPConn, DynBuf, BodyReader, HTTPReq, HTTPRes, BufferGenerator } from "
 import { bufPush, bufPop, fieldGet } from "./methods/buffer"
 import { HTTPError, parseHTTPReq } from "./methods/http"
 import { serveStaticFile } from "./methods/file"
+import { enableCompression } from "./methods/compression"
 
 function soInit(socket: net.Socket): TCPConn {
     const conn: TCPConn = {
@@ -356,6 +357,7 @@ async function serveClient(conn: TCPConn): Promise<void> {
         const res: HTTPRes = await handleReq(msg, reqBody);
         try {
             // send the response
+            enableCompression(msg, res);
             await writeHTTPHeader(conn, res);
             if (msg.method !== 'HEAD')
                 await writeHTTPBody(conn, res.body);

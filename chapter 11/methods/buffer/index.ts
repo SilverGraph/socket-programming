@@ -60,4 +60,16 @@ function fieldGet(headers: Buffer[], key: string): Buffer | null {
     return null;
 }
 
-export { bufPush, bufPop, fieldGet, parseRequestLine, splitLines, validateHeader }
+function fieldGetList(headers: Buffer[], key: string): string[] {
+    let values: string[] = []
+    for (const header of headers) {
+        const h = header.toString()
+        const i = h.indexOf(":")
+        if (h.substring(0, i).trim() === key) {
+            values = h.substring(i + 1).split(",").map(v => v.trim())
+        }
+    }
+    return values
+}
+
+export { bufPush, bufPop, fieldGet, parseRequestLine, splitLines, validateHeader, fieldGetList }
